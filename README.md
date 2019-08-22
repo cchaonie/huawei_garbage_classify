@@ -1,0 +1,2 @@
+# huawei_garbage_classify
+huawei_garbage_classify
