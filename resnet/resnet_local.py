@@ -18,17 +18,17 @@ from glob import glob
 import codecs
 import math
 
-save_dir_obs = '../output/model'
+save_dir_obs = '../../output/model'
 
-data_dir = "../garbage_classify/train_data"
+data_dir = "../../train_data"
 
-model_local = "../pretrained/"
+model_local = "../../pretrained"
 
 num_classes = 40
 
 batch_size = 128
 
-num_workers = 0
+num_workers = 4
 
 num_epochs = 10
 
@@ -41,7 +41,9 @@ input_size = 224
 test_percent = .3
 
 def init_model(model_name, state_path, num_classes):
-    model = models.resnet18() if model_name == 'resnet18' else models.resnet50()
+    model = models.resnet18()
+    if model_name == 'resnet50':
+        model = models.resnet50()
     model.load_state_dict(torch.load(state_path))
     for param in model.parameters():
         param.requires_grad = False
@@ -116,8 +118,7 @@ def custom_split(img_paths, labels):
             else:
                 train_paths.append(img_paths[label_i])
                 train_labels.append(labels[label_i])
-    print('train path: %d, test path: %d, train label: %d, test label: %d'
-          % (len(train_paths), len(test_paths), len(train_labels), len(test_labels)))
+    print('train data count: %d, test data count: %d' % (len(train_paths), len(test_paths)))
     results1 = []
     results2 = []
     for i in range(len(train_paths)):
@@ -128,7 +129,7 @@ def custom_split(img_paths, labels):
 
 
 train_data, val_data = custom_split(img_paths, labels)
-print(train_data[0], val_data[0])
+# print(train_data[0], val_data[0])
 
 composed_transform = transforms.Compose([
     transforms.Resize(256),
@@ -159,9 +160,8 @@ dataloaders_dict = {
 }
 print("Initialization finished...")
 
-if torch.cuda.device_count() > 0:
-    print("GPU count: %d" % torch.cuda.device_count())
-    
+print("GPU count: %d" % torch.cuda.device_count())
+
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 model.to(device)
 
@@ -174,7 +174,6 @@ for name, param in model.named_parameters():
         print("\t", name)
 
 optimizer = optim.SGD(params_to_update, lr=learning_rate, momentum=momentum)
-
 criterion = nn.CrossEntropyLoss()
 
 def train_model(model, dataloaders, criterion, optimizer, num_epochs=num_epochs):
@@ -206,12 +205,10 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=num_epochs)
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
                     inputs = inputs.to(device)
-                    
                     outputs = model(inputs)
                     labels = labels.to(outputs.device)
                     loss = criterion(outputs, labels)
                     _, preds = torch.max(outputs, 1)
-
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
@@ -220,12 +217,11 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=num_epochs)
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
-            epoch_loss=running_loss / len(dataloaders[phase].dataset)
-            epoch_acc=running_corrects.double(
-            ) / len(dataloaders[phase].dataset)
 
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(
-                phase, epoch_loss, epoch_acc))
+            epoch_loss=running_loss / len(dataloaders[phase].dataset)
+            epoch_acc=running_corrects.double() / len(dataloaders[phase].dataset)
+
+            print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
 
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
